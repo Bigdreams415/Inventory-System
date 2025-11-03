@@ -6,6 +6,8 @@ import { dbService } from './models/database';
 
 // Import routes
 import productRoutes from './routes/products';
+import saleRoutes from './routes/sales';
+import dashboardRoutes from './routes/dashboard';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -19,6 +21,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/products', productRoutes);
+app.use('/api/sales', saleRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -37,6 +41,8 @@ app.get('/api', (_req, res) => {
     version: '1.0.0',
     endpoints: {
       products: '/api/products',
+      sales: '/api/sales',
+      dashboard: '/api/dashboard',
       health: '/api/health'
     }
   });
@@ -81,9 +87,9 @@ async function startServer() {
 
     // Start Express server
     app.listen(PORT, () => {
-      console.log(`🚀 POS Server running on http://localhost:${PORT}`);
-      console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`🔗 API Base: http://localhost:${PORT}/api`);
+      console.log(`POS Server running on http://localhost:${PORT}`);
+      console.log(`Health check: http://localhost:${PORT}/api/health`);
+      console.log(`API Base: http://localhost:${PORT}/api`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

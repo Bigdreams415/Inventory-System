@@ -1,7 +1,8 @@
-// src/pages/Inventory.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Product } from '../types';
 import { useProducts } from '../hooks/useProducts';
+import { useBarcode } from '../hooks/useBarcode';
+import { apiService } from '../services/api'; 
 
 const Inventory: React.FC = () => {
   const { 
@@ -236,6 +237,10 @@ const Inventory: React.FC = () => {
             setShowAddForm(false);
             setActionError(null);
           }}
+          onEditExisting={(prod) => {
+            setShowAddForm(false);
+            setEditingProduct(prod);
+          }}
         />
       )}
 
@@ -254,14 +259,20 @@ const Inventory: React.FC = () => {
   );
 };
 
-// Product Form Component
+// Updated Product Form Component with Barcode Scanner Features
 interface ProductFormProps {
   product?: Product;
   onSave: (product: Product | Omit<Product, 'id'>) => Promise<void>;
   onCancel: () => void;
+  onEditExisting?: (product: Product) => void; // New prop to handle switching to edit mode
 }
 
-const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCancel }) => {
+const ProductForm: React.FC<ProductFormProps> = ({ 
+  product, 
+  onSave, 
+  onCancel, 
+  onEditExisting 
+}) => {
   const [formData, setFormData] = useState({
     name: product?.name || '',
     buy_price: product?.buy_price || 0,
@@ -273,7 +284,58 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCancel }) 
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [barcodeError, setBarcodeError] = useState<string | null>(null);
+  const [barcodeLoading, setBarcodeLoading] = useState(false);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
 
+  const { 
+    handleBarcodeScan, 
+    scannedProduct, 
+    clearScannedProduct,
+    loading: barcodeScanLoading 
+  } = useBarcode();
+
+  // Auto-fill form when product is scanned
+  useEffect(() => {
+    if (scannedProduct && !product) {
+      // Only auto-fill when adding new product (not editing)
+      setFormData(prev => ({
+        ...prev,
+        name: scannedProduct.name,
+        buy_price: scannedProduct.buy_price,
+        sell_price: scannedProduct.sell_price,
+        category: scannedProduct.category,
+        description: scannedProduct.description || '',
+        barcode: scannedProduct.barcode || formData.barcode
+      }));
+    }
+  }, [scannedProduct, product]);
+
+  // Handle barcode input (from scanner or manual)
+  const handleBarcodeInput = async (barcode: string) => {
+    if (!barcode.trim()) return;
+    
+    setBarcodeLoading(true);
+    setBarcodeError(null);
+    
+    try {
+      await handleBarcodeScan(barcode);
+    } catch (error) {
+      setBarcodeError('Failed to process barcode');
+    } finally {
+      setBarcodeLoading(false);
+    }
+  };
+
+  // Handle barcode field blur (when user leaves the field)
+  const handleBarcodeBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const barcode = e.target.value.trim();
+    if (barcode && barcode !== product?.barcode) {
+      handleBarcodeInput(barcode);
+    }
+  };
+
+  // Handle form submission with barcode validation
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -286,6 +348,24 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCancel }) 
     if (formData.buy_price < 0 || formData.sell_price < 0 || formData.stock < 0) {
       alert('Prices and stock cannot be negative!');
       return;
+    }
+
+    // Check for duplicate barcode when adding new product
+    if (!product && formData.barcode) {
+      try {
+        const exists = await apiService.checkBarcodeExists(formData.barcode);
+        if (exists.exists) {
+          const useExisting = confirm(
+            `Barcode "${formData.barcode}" already exists for product "${exists.product?.name}".\n\nDo you want to update the existing product instead?`
+          );
+          if (useExisting && exists.product) {
+            onEditExisting?.(exists.product);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking barcode:', error);
+      }
     }
 
     setIsSubmitting(true);
@@ -314,6 +394,40 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCancel }) 
           {product ? 'Edit Product' : 'Add New Product'}
         </h3>
         
+        {/* Barcode Scanner Status */}
+        {scannedProduct && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-800">
+                  📦 Product Found: {scannedProduct.name}
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  {product ? 'Product details loaded' : 'Auto-filled product details'}
+                </p>
+              </div>
+              <button
+                onClick={clearScannedProduct}
+                className="text-green-600 hover:text-green-800 text-sm"
+                type="button"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
+
+        {barcodeError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm font-medium text-red-800">
+              ❌ {barcodeError}
+            </p>
+            <p className="text-xs text-red-600 mt-1">
+              Barcode not found in database
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -413,16 +527,31 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCancel }) 
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Barcode (Optional)
+              Barcode {!product && '(Scan with barcode scanner)'}
             </label>
-            <input
-              type="text"
-              value={formData.barcode}
-              onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={isSubmitting}
-              placeholder="Scan or enter barcode"
-            />
+            <div className="space-y-2">
+              <input
+                ref={barcodeInputRef}
+                type="text"
+                value={formData.barcode}
+                onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                onBlur={handleBarcodeBlur}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isSubmitting}
+                placeholder="Scan barcode or type manually"
+                autoFocus={!product} // Auto-focus on barcode field for new products
+              />
+              {barcodeScanLoading && (
+                <p className="text-sm text-blue-600 flex items-center">
+                  <span className="animate-spin mr-2">⟳</span>
+                  Searching for product...
+                </p>
+              )}
+              <p className="text-xs text-gray-500">
+                💡 Tip: Use your barcode scanner to quickly scan product barcodes. 
+                The system will auto-fill product details if the barcode exists.
+              </p>
+            </div>
           </div>
 
           <div>

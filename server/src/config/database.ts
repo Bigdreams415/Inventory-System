@@ -54,13 +54,10 @@ const createTables = (db: sqlite3.Database): Promise<void> => {
     const salesTable = `
       CREATE TABLE IF NOT EXISTS sales (
         id TEXT PRIMARY KEY,
-        total REAL NOT NULL CHECK (total >= 0),
-        tax REAL NOT NULL DEFAULT 0 CHECK (tax >= 0),
-        discount REAL NOT NULL DEFAULT 0 CHECK (discount >= 0),
-        final_total REAL NOT NULL CHECK (final_total >= 0),
+        total_amount REAL NOT NULL CHECK (total_amount >= 0),
+        total_profit REAL NOT NULL CHECK (total_profit >= 0),
         payment_method TEXT NOT NULL CHECK (payment_method IN ('cash', 'card', 'transfer')),
-        customer_name TEXT,
-        customer_phone TEXT,
+        status TEXT NOT NULL DEFAULT 'completed' CHECK (status IN ('completed', 'refunded')),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `;
@@ -71,8 +68,10 @@ const createTables = (db: sqlite3.Database): Promise<void> => {
         sale_id TEXT NOT NULL,
         product_id TEXT NOT NULL,
         quantity INTEGER NOT NULL CHECK (quantity > 0),
-        unit_price REAL NOT NULL CHECK (unit_price >= 0),
-        total_price REAL NOT NULL CHECK (total_price >= 0),
+        unit_sell_price REAL NOT NULL CHECK (unit_sell_price >= 0),
+        unit_buy_price REAL NOT NULL CHECK (unit_buy_price >= 0),
+        total_sell_price REAL NOT NULL CHECK (total_sell_price >= 0),
+        item_profit REAL NOT NULL CHECK (item_profit >= 0),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT

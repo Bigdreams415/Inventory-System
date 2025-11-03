@@ -16,18 +16,40 @@ export interface CartItem {
   quantity: number;
   unit_price: number;
 }
+export interface SaleItem {
+  id: string;
+  sale_id: string;
+  product_id: string;
+  quantity: number;
+  unit_sell_price: number;
+  unit_buy_price: number;
+  total_sell_price: number;
+  item_profit: number;
+  created_at: string;
+  product?: Product;  
+}
 
 export interface Sale {
   id: string;
-  items: CartItem[];
-  total: number;
-  tax: number;
-  discount: number;
-  final_total: number;
+  total_amount: number;
+  total_profit: number;
   payment_method: 'cash' | 'card' | 'transfer';
-  customer_name?: string;
-  customer_phone?: string;
+  status: 'completed' | 'refunded';
   created_at: string;
+  items?: SaleItem[];  
+}
+
+export interface CreateSaleRequest {
+  items: Array<{
+    product_id: string;
+    quantity: number;
+    unit_sell_price: number;
+  }>;
+  payment_method: 'cash' | 'card' | 'transfer';
+}
+
+export interface SaleWithItems extends Sale {
+  items: SaleItem[];
 }
 
 export interface Customer {

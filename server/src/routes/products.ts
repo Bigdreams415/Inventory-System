@@ -9,6 +9,9 @@ router.get('/', ProductController.getAllProducts);
 // GET /api/products/search - Search products
 router.get('/search', ProductController.searchProducts);
 
+// GET /api/products/barcode/:barcode - Get product by barcode
+router.get('/barcode/:barcode', ProductController.getProductByBarcode);
+
 // GET /api/products/low-stock - Get low stock products
 router.get('/low-stock', ProductController.getLowStockProducts);
 

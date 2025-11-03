@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { ProductModel } from '../models/Product';
-import { ApiResponse, PaginatedResponse, Product } from '../types';
+import { ApiResponse, PaginatedResponse, Product} from '../types';
 
 export class ProductController {
   // Get all products
@@ -48,6 +48,42 @@ export class ProductController {
         error: 'Failed to fetch product'
       };
       res.status(500).json(response);
+    }
+  }
+
+  // barcode lookup
+  public static async getProductByBarcode(req: Request, res: Response): Promise<void> {
+    try {
+      const { barcode } = req.params;
+      
+      if (!barcode) {
+        res.status(400).json({
+          success: false,
+          error: 'Barcode is required'
+        });
+        return;
+      }
+
+      const product = await ProductModel.getByBarcode(barcode);
+
+      if (!product) {
+        res.status(404).json({
+          success: false,
+          error: 'Product not found with this barcode'
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: product
+      });
+    } catch (error) {
+      console.error('Error fetching product by barcode:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch product by barcode'
+      });
     }
   }
 
