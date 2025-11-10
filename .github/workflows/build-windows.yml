@@ -9,6 +9,8 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    env:
+      WIN_CODESIGN_SKIP: 1   # Skip Windows code signing
 
     steps:
       - name: Checkout Repository
