@@ -113,6 +113,16 @@ class DatabaseService {
     });
   }
 
+  public async getTotalStockWorth(pharmacyId: string): Promise<number> {
+    const result = await this.get<{ total_worth: number }>(`
+      SELECT COALESCE(SUM(stock * buy_price), 0) as total_worth 
+      FROM products 
+      WHERE pharmacy_id = ?
+    `, [pharmacyId]);
+    
+    return result?.total_worth || 0;
+  }
+
   // Get database info
   public getDatabaseInfo() {
     return {

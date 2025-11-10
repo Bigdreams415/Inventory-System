@@ -3,10 +3,12 @@ import { ProductModel } from '../models/Product';
 import { ApiResponse, PaginatedResponse, Product} from '../types';
 
 export class ProductController {
-  // Get all products
+  // Get all products for current pharmacy
   static async getAllProducts(req: Request, res: Response) {
     try {
-      const products = await ProductModel.getAll();
+      const pharmacyId = req.pharmacyId!;
+      const products = await ProductModel.getAll(pharmacyId);
+      
       const response: ApiResponse<Product[]> = {
         success: true,
         data: products
@@ -22,11 +24,13 @@ export class ProductController {
     }
   }
 
-  // Get product by ID
+  // Get product by ID for current pharmacy
   static async getProductById(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const product = await ProductModel.getById(id);
+      const pharmacyId = req.pharmacyId!;
+      
+      const product = await ProductModel.getById(id, pharmacyId);
       
       if (!product) {
         const response: ApiResponse<null> = {
@@ -51,10 +55,11 @@ export class ProductController {
     }
   }
 
-  // barcode lookup
+  // Barcode lookup for current pharmacy
   public static async getProductByBarcode(req: Request, res: Response): Promise<void> {
     try {
       const { barcode } = req.params;
+      const pharmacyId = req.pharmacyId!;
       
       if (!barcode) {
         res.status(400).json({
@@ -64,7 +69,7 @@ export class ProductController {
         return;
       }
 
-      const product = await ProductModel.getByBarcode(barcode);
+      const product = await ProductModel.getByBarcode(barcode, pharmacyId);
 
       if (!product) {
         res.status(404).json({
@@ -87,10 +92,11 @@ export class ProductController {
     }
   }
 
-  // Create new product - UPDATED VALIDATION
+  // Create new product for current pharmacy
   static async createProduct(req: Request, res: Response) {
     try {
       const productData = req.body;
+      const pharmacyId = req.pharmacyId!;
       
       // Enhanced validation with new fields
       const validation = ProductModel.validateProductData(productData);
@@ -102,7 +108,13 @@ export class ProductController {
         return res.status(400).json(response);
       }
 
-      const newProduct = await ProductModel.create(productData);
+      // Add pharmacy ID to product data
+      const productDataWithPharmacy = {
+        ...productData,
+        pharmacy_id: pharmacyId
+      };
+
+      const newProduct = await ProductModel.create(productDataWithPharmacy);
       const response: ApiResponse<Product> = {
         success: true,
         data: newProduct,
@@ -119,14 +131,15 @@ export class ProductController {
     }
   }
 
-  // Update product - UPDATED VALIDATION
+  // Update product for current pharmacy
   static async updateProduct(req: Request, res: Response) {
     try {
       const { id } = req.params;
       const productData = req.body;
+      const pharmacyId = req.pharmacyId!;
 
-      // Check if product exists
-      const existingProduct = await ProductModel.getById(id);
+      // Check if product exists in current pharmacy
+      const existingProduct = await ProductModel.getById(id, pharmacyId);
       if (!existingProduct) {
         const response: ApiResponse<null> = {
           success: false,
@@ -184,7 +197,7 @@ export class ProductController {
         }
       }
 
-      const updatedProduct = await ProductModel.update(id, productData);
+      const updatedProduct = await ProductModel.update(id, productData, pharmacyId);
       const response: ApiResponse<Product> = {
         success: true,
         data: updatedProduct,
@@ -201,12 +214,13 @@ export class ProductController {
     }
   }
 
-  // Delete product (unchanged)
+  // Delete product from current pharmacy
   static async deleteProduct(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const pharmacyId = req.pharmacyId!;
 
-      const existingProduct = await ProductModel.getById(id);
+      const existingProduct = await ProductModel.getById(id, pharmacyId);
       if (!existingProduct) {
         const response: ApiResponse<null> = {
           success: false,
@@ -215,7 +229,7 @@ export class ProductController {
         return res.status(404).json(response);
       }
 
-      await ProductModel.delete(id);
+      await ProductModel.delete(id, pharmacyId);
       const response: ApiResponse<null> = {
         success: true,
         message: 'Product deleted successfully'
@@ -231,10 +245,11 @@ export class ProductController {
     }
   }
 
-  // Search products (unchanged)
+  // Search products in current pharmacy
   static async searchProducts(req: Request, res: Response) {
     try {
       const { q } = req.query;
+      const pharmacyId = req.pharmacyId!;
       
       if (!q || typeof q !== 'string') {
         const response: ApiResponse<null> = {
@@ -244,7 +259,7 @@ export class ProductController {
         return res.status(400).json(response);
       }
 
-      const products = await ProductModel.search(q);
+      const products = await ProductModel.search(q, pharmacyId);
       const response: ApiResponse<Product[]> = {
         success: true,
         data: products
@@ -260,11 +275,12 @@ export class ProductController {
     }
   }
 
-  // Update stock (unchanged)
+  // Update stock for current pharmacy
   static async updateStock(req: Request, res: Response) {
     try {
       const { id } = req.params;
       const { stock } = req.body;
+      const pharmacyId = req.pharmacyId!;
 
       if (typeof stock !== 'number' || stock < 0) {
         const response: ApiResponse<null> = {
@@ -274,7 +290,7 @@ export class ProductController {
         return res.status(400).json(response);
       }
 
-      const existingProduct = await ProductModel.getById(id);
+      const existingProduct = await ProductModel.getById(id, pharmacyId);
       if (!existingProduct) {
         const response: ApiResponse<null> = {
           success: false,
@@ -283,7 +299,7 @@ export class ProductController {
         return res.status(404).json(response);
       }
 
-      await ProductModel.updateStock(id, stock);
+      await ProductModel.updateStock(id, stock, pharmacyId);
       const response: ApiResponse<null> = {
         success: true,
         message: 'Stock updated successfully'
@@ -299,10 +315,11 @@ export class ProductController {
     }
   }
 
-  // NEW: Get products with profit margin (for future dashboard)
+  // Get products with profit margin for current pharmacy
   static async getProductsWithMargin(req: Request, res: Response) {
     try {
-      const products = await ProductModel.getAll();
+      const pharmacyId = req.pharmacyId!;
+      const products = await ProductModel.getAll(pharmacyId);
       
       // Calculate profit margin for each product
       const productsWithMargin = products.map(product => {
@@ -328,13 +345,14 @@ export class ProductController {
     }
   }
 
-  // NEW: Get low stock products with enhanced info
+  // Get low stock products for current pharmacy
   static async getLowStockProducts(req: Request, res: Response) {
     try {
       const { threshold = 10 } = req.query;
       const thresholdNum = parseInt(threshold as string, 10) || 10;
+      const pharmacyId = req.pharmacyId!;
 
-      const products = await ProductModel.getLowStock(thresholdNum);
+      const products = await ProductModel.getLowStock(thresholdNum, pharmacyId);
       
       const productsWithValue = products.map(product => ({
         ...product,

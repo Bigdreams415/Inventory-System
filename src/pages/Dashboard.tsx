@@ -1,6 +1,32 @@
 import React from 'react';
 import { useDashboard } from '../hooks/useDashboard';
 import { format } from 'date-fns';
+import { 
+  Chart as ChartJS, 
+  CategoryScale, 
+  LinearScale, 
+  BarElement, 
+  LineElement, 
+  PointElement, 
+  ArcElement,
+  Title, 
+  Tooltip, 
+  Legend 
+} from 'chart.js';
+import { Bar, Doughnut } from 'react-chartjs-2';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const Dashboard: React.FC = () => {
   const { 
@@ -38,9 +64,9 @@ const Dashboard: React.FC = () => {
 
   // Helper function to format currency
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-NG', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'NGN'
     }).format(amount);
   };
 
@@ -54,10 +80,98 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // Chart data for sales trend
+  const salesTrendData = {
+    labels: salesTrend?.labels || [],
+    datasets: [
+      {
+        label: 'Revenue',
+        data: salesTrend?.revenue || [],
+        backgroundColor: 'rgba(59, 130, 246, 0.6)',
+        borderColor: 'rgba(59, 130, 246, 1)',
+        borderWidth: 2,
+        borderRadius: 4,
+        borderSkipped: false,
+      },
+      {
+        label: 'Profit',
+        data: salesTrend?.profit || [],
+        backgroundColor: 'rgba(16, 185, 129, 0.6)',
+        borderColor: 'rgba(16, 185, 129, 1)',
+        borderWidth: 2,
+        borderRadius: 4,
+        borderSkipped: false,
+      }
+    ]
+  };
+
+  const salesTrendOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: false,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.1)',
+        },
+        ticks: {
+          callback: function(value: any) {
+            return '₦' + value.toLocaleString('en-NG');
+          }
+        }
+      },
+      x: {
+        grid: {
+          display: false,
+        },
+      },
+    },
+  };
+
+  // Chart data for categories
+  const categoryData = {
+    labels: categories.map(cat => cat.name),
+    datasets: [
+      {
+        data: categories.map(cat => cat.revenue),
+        backgroundColor: [
+          '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
+          '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'
+        ],
+        borderWidth: 2,
+        borderColor: '#fff',
+      }
+    ]
+  };
+
+  const categoryOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'right' as const,
+        labels: {
+          boxWidth: 12,
+          padding: 15,
+          usePointStyle: true,
+        },
+      },
+    },
+    cutout: '60%',
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Dashboard Overview</h2>
           <p className="text-gray-600 mt-1">Real-time analytics and business insights</p>
@@ -68,135 +182,125 @@ const Dashboard: React.FC = () => {
           </div>
           <button 
             onClick={refreshDashboard}
-            className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm transition-colors"
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm transition-colors flex items-center space-x-2"
           >
-            🔄 Refresh
+            <span>🔄</span>
+            <span>Refresh</span>
           </button>
         </div>
       </div>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Today's Performance */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-700">Today's Revenue</h3>
-            <span className="text-2xl">💰</span>
+            <h3 className="text-sm font-semibold text-gray-700">Today's Revenue</h3>
+            <span className="text-xl">💰</span>
           </div>
-          <p className="text-3xl font-bold text-green-600 mt-2">
+          <p className="text-2xl font-bold text-green-600 mt-2">
             {formatCurrency(summary?.todayRevenue || 0)}
           </p>
-          <p className={`text-sm mt-1 ${summary?.revenueChange && summary.revenueChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <p className={`text-xs mt-1 ${summary?.revenueChange && summary.revenueChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {summary?.revenueChange && summary.revenueChange >= 0 ? '↑' : '↓'} 
             {Math.abs(summary?.revenueChange || 0)}% from yesterday
           </p>
         </div>
 
         {/* Inventory Overview */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-700">Total Products</h3>
-            <span className="text-2xl">📦</span>
+            <h3 className="text-sm font-semibold text-gray-700">Total Products</h3>
+            <span className="text-xl">📦</span>
           </div>
-          <p className="text-3xl font-bold text-blue-600 mt-2">{summary?.totalProducts || 0}</p>
-          <p className="text-sm text-gray-500 mt-1">Across {summary?.totalCategories || 0} categories</p>
+          <p className="text-2xl font-bold text-blue-600 mt-2">{summary?.totalProducts || 0}</p>
+          <p className="text-xs text-gray-500 mt-1">Across {summary?.totalCategories || 0} categories</p>
         </div>
 
         {/* Stock Alerts */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-700">Low Stock</h3>
-            <span className="text-2xl">⚠️</span>
+            <h3 className="text-sm font-semibold text-gray-700">Low Stock</h3>
+            <span className="text-xl">⚠️</span>
           </div>
-          <p className="text-3xl font-bold text-orange-600 mt-2">{summary?.lowStockCount || 0}</p>
-          <p className="text-sm text-gray-500 mt-1">Need restocking</p>
+          <p className="text-2xl font-bold text-orange-600 mt-2">{summary?.lowStockCount || 0}</p>
+          <p className="text-xs text-gray-500 mt-1">Need restocking</p>
         </div>
 
         {/* Sales Activity */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-700">Today's Orders</h3>
-            <span className="text-2xl">📋</span>
+            <h3 className="text-sm font-semibold text-gray-700">Today's Orders</h3>
+            <span className="text-xl">📋</span>
           </div>
-          <p className="text-3xl font-bold text-purple-600 mt-2">{summary?.todayOrders || 0}</p>
-          <p className="text-sm text-gray-500 mt-1">{summary?.todayItemsSold || 0} items sold</p>
+          <p className="text-2xl font-bold text-purple-600 mt-2">{summary?.todayOrders || 0}</p>
+          <p className="text-xs text-gray-500 mt-1">{summary?.todayItemsSold || 0} items sold</p>
         </div>
       </div>
 
       {/* Charts & Analytics Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Sales Trend Chart */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Sales Trend (Last 7 Days)</h3>
-          <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-700">Sales Trend (Last 7 Days)</h3>
+          </div>
+          <div className="h-80">
             {salesTrend && salesTrend.labels.length > 0 ? (
-              <div className="w-full h-full">
-                {/* Simple bar chart visualization */}
-                <div className="flex items-end justify-between h-48 space-x-2">
-                  {salesTrend.revenue.map((revenue, index) => (
-                    <div key={index} className="flex flex-col items-center flex-1">
-                      <div 
-                        className="bg-blue-500 rounded-t w-full max-w-12 transition-all hover:bg-blue-600"
-                        style={{ height: `${(revenue / Math.max(...salesTrend.revenue)) * 80}%` }}
-                        title={`${salesTrend.labels[index]}: ${formatCurrency(revenue)}`}
-                      ></div>
-                      <div className="text-xs text-gray-500 mt-2 text-center">
-                        {salesTrend.labels[index]}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-center space-x-6 mt-4 text-sm">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-blue-500 rounded mr-2"></div>
-                    <span className="text-gray-600">Revenue: {formatCurrency(salesTrend.revenue.reduce((a, b) => a + b, 0))}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-green-500 rounded mr-2"></div>
-                    <span className="text-gray-600">Profit: {formatCurrency(salesTrend.profit.reduce((a, b) => a + b, 0))}</span>
-                  </div>
+              <Bar data={salesTrendData} options={salesTrendOptions} />
+            ) : (
+              <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                <div className="text-center text-gray-500">
+                  <div className="text-4xl mb-2">📊</div>
+                  <p>No sales data available</p>
+                  <p className="text-sm">Sales data will appear here</p>
                 </div>
               </div>
-            ) : (
-              <p className="text-gray-500">No sales data available for the last 7 days</p>
             )}
           </div>
         </div>
 
         {/* Product Categories */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Product Categories</h3>
-          <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-700">Revenue by Category</h3>
+          </div>
+          <div className="h-80">
             {categories.length > 0 ? (
-              <div className="w-full">
-                {/* Simple pie chart visualization using flex */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  {categories.slice(0, 4).map((category, index) => (
-                    <div key={category.name} className="flex items-center space-x-2">
-                      <div 
-                        className="w-4 h-4 rounded"
-                        style={{
-                          backgroundColor: [
-                            '#3B82F6', '#10B981', '#F59E0B', '#EF4444'
-                          ][index % 4]
-                        }}
-                      ></div>
-                      <span className="text-sm text-gray-700 truncate">{category.name}</span>
-                      <span className="text-sm text-gray-500">({category.count})</span>
-                    </div>
-                  ))}
+              <div className="flex flex-col lg:flex-row h-full">
+                <div className="lg:w-2/3 h-64 lg:h-full">
+                  <Doughnut data={categoryData} options={categoryOptions} />
                 </div>
-                <div className="space-y-2 text-sm">
-                  {categories.map(category => (
-                    <div key={category.name} className="flex justify-between items-center">
-                      <span className="text-gray-600">{category.name}</span>
-                      <span className="font-semibold">{formatCurrency(category.revenue)}</span>
-                    </div>
-                  ))}
+                <div className="lg:w-1/3 lg:pl-4 mt-4 lg:mt-0">
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {categories.map((category, index) => (
+                      <div key={category.name} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                        <div className="flex items-center space-x-2 min-w-0 flex-1">
+                          <div 
+                            className="w-3 h-3 rounded flex-shrink-0"
+                            style={{
+                              backgroundColor: categoryData.datasets[0].backgroundColor[index]
+                            }}
+                          ></div>
+                          <span className="text-sm text-gray-700 truncate">{category.name}</span>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-sm font-semibold">{formatCurrency(category.revenue)}</div>
+                          <div className="text-xs text-gray-500">{category.count} products</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : (
-              <p className="text-gray-500">No category data available</p>
+              <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                <div className="text-center text-gray-500">
+                  <div className="text-4xl mb-2">📦</div>
+                  <p>No category data available</p>
+                  <p className="text-sm">Product categories will appear here</p>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -204,35 +308,36 @@ const Dashboard: React.FC = () => {
 
       {/* Bottom Section - Quick Overviews */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Sales */}
+        {/* Total Stock Worth */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-700">Recent Sales</h3>
-            <span className="text-sm text-gray-500">{recentSales.length} sales</span>
+            <h3 className="text-lg font-semibold text-gray-700">Total Stock Worth</h3>
+            <span className="text-sm text-gray-500">Inventory Value</span>
           </div>
-          <div className="space-y-3">
-            {recentSales.length > 0 ? (
-              recentSales.map(sale => (
-                <div key={sale.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <div className="font-medium text-gray-900">
-                      {formatCurrency(sale.total_amount)}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {sale.items_count} items • {format(new Date(sale.created_at), 'HH:mm')}
-                    </div>
-                  </div>
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${getPaymentMethodColor(sale.payment_method)}`}>
-                    {sale.payment_method}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-4xl mb-2">📊</div>
-                No recent sales
+          <div className="space-y-4">
+            <div className="text-center py-4">
+              <div className="text-4xl mb-3">💰</div>
+              <div className="text-3xl font-bold text-purple-600">
+                {formatCurrency(summary?.totalStockWorth || 0)}
               </div>
-            )}
+              <p className="text-sm text-gray-500 mt-2">
+                Total investment in inventory
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <div className="text-xs text-blue-600 font-medium">Products</div>
+                <div className="text-lg font-bold text-blue-700">{summary?.totalProducts || 0}</div>
+              </div>
+              <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                <div className="text-xs text-green-600 font-medium">Categories</div>
+                <div className="text-lg font-bold text-green-700">{summary?.totalCategories || 0}</div>
+              </div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg text-center">
+              <div className="text-xs text-gray-600">Calculated using</div>
+              <div className="text-sm font-medium text-gray-700">Buy Price × Stock Quantity</div>
+            </div>
           </div>
         </div>
 
@@ -242,15 +347,15 @@ const Dashboard: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-700">Low Stock Alert</h3>
             <span className="text-sm text-gray-500">{lowStockProducts.length} products</span>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-80 overflow-y-auto">
             {lowStockProducts.length > 0 ? (
               lowStockProducts.map(product => (
-                <div key={product.id} className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
-                  <div>
-                    <div className="font-medium text-gray-900">{product.name}</div>
-                    <div className="text-sm text-gray-600">{product.category}</div>
+                <div key={product.id} className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200 hover:bg-orange-100 transition-colors">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-gray-900 truncate">{product.name}</div>
+                    <div className="text-sm text-gray-600 truncate">{product.category}</div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex-shrink-0 ml-2">
                     <div className="font-semibold text-orange-600">{product.stock} left</div>
                     <div className="text-xs text-gray-500">{formatCurrency(product.sell_price)}</div>
                   </div>

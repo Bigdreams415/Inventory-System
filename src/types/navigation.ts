@@ -1,1 +1,1 @@
-export type PageType = 'dashboard' | 'pos' | 'inventory' | 'sales';
+export type PageType = 'dashboard' | 'pos' | 'inventory' | 'sales' | 'services' | 'admin' | 'settings';

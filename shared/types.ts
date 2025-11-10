@@ -54,3 +54,32 @@ export interface PaginatedResponse<T> {
     totalPages: number;
   };
 }
+
+export interface Pharmacy {
+  id: string;
+  name: string;
+  location: string;
+  address?: string;
+  phone_number?: string;
+  email?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreatePharmacyRequest {
+  name: string;
+  location: string;
+  address?: string;
+  phone_number?: string;
+  email?: string;
+}
+
+export interface UpdatePharmacyRequest {
+  name?: string;
+  location?: string;
+  address?: string;
+  phone_number?: string;
+  email?: string;
+  is_active?: boolean;
+}

@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { SaleController } from '../controllers/saleController';
 import { dbService } from '../models/database';
-
+import { AuthMiddleware } from '../middleware/authMiddleware';
 const router = Router();
 
 // POST /api/sales - Create new sale
 router.post('/', SaleController.createSale);
 
 // GET /api/sales - Get all sales with pagination
-router.get('/', SaleController.getSales);
+router.get('/', AuthMiddleware.requireAuth, SaleController.getSales);
 
 // GET /api/sales/today - Get today's sales with summary
 router.get('/today', SaleController.getTodaySales);
@@ -17,7 +17,7 @@ router.get('/today', SaleController.getTodaySales);
 router.get('/:id', SaleController.getSaleById);
 
 // DEBUG: Check specific products by IDs
-router.get('/debug/check-products', async (req, res) => {
+router.get('/debug/check-products', AuthMiddleware.requireAuth, async (req, res) => {
   try {
     const { productIds } = req.query;
     
@@ -60,7 +60,7 @@ router.get('/debug/check-products', async (req, res) => {
 });
 
 // DEBUG: Get all products (for comparison)
-router.get('/debug/all-products', async (_req, res) => {
+router.get('/debug/all-products', AuthMiddleware.requireAuth, async (_req, res) => {
   try {
     const products = await dbService.all(`
       SELECT id, name, stock, buy_price, sell_price, created_at 
@@ -82,7 +82,7 @@ router.get('/debug/all-products', async (_req, res) => {
 });
 
 // DEBUG: Check database schema
-router.get('/debug/schema', async (_req, res) => {
+router.get('/debug/schema', AuthMiddleware.requireAuth, async (_req, res) => {
   try {
     const tables = await dbService.all(`
       SELECT name FROM sqlite_master 

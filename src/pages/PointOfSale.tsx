@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Product, CartItem } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Product, CartItem, Sale } from '../types';
 import { useProducts } from '../hooks/useProducts';
 import { useSales } from '../hooks/useSales';
 import { useBarcode } from '../hooks/useBarcode';
@@ -16,6 +16,9 @@ const PointOfSale: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
   const [saleSuccess, setSaleSuccess] = useState<string | null>(null);
+  const [lastSale, setLastSale] = useState<Sale | null>(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   // Get unique categories for filter
   const categories = ['all', ...Array.from(new Set(products.map(product => product.category)))];
@@ -47,8 +50,9 @@ const PointOfSale: React.FC = () => {
       // Clear the scanned product after a brief delay to allow UI feedback
       setTimeout(() => clearScannedProduct(), 1500);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scannedProduct, productsLoading]);
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   // Clear success message after 5 seconds
   useEffect(() => {
     if (saleSuccess) {
@@ -136,16 +140,137 @@ const PointOfSale: React.FC = () => {
       // Send to backend
       const result = await createSale(saleData);
       
+      // Store the sale for receipt
+      setLastSale(result);
+      
       // Success!
-      setSaleSuccess(`Sale processed successfully! Total: $${result.total_amount.toFixed(2)}`);
+      setSaleSuccess(`Sale processed successfully! Total: ₦${result.total_amount.toFixed(2)}`);
       setCart([]);
       setShowPaymentModal(false);
       setPaymentMethod('cash');
+      
+      // Show receipt modal
+      setShowReceiptModal(true);
       
     } catch (error) {
       // Error is handled by the useSales hook
       console.error('Sale processing error:', error);
     }
+  };
+
+  // Function to print receipt
+  const printReceipt = () => {
+    if (!receiptRef.current) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow pop-ups to print receipt');
+      return;
+    }
+
+    const receiptContent = receiptRef.current.innerHTML;
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Receipt - ${lastSale?.id}</title>
+          <style>
+            body { 
+              font-family: 'Courier New', monospace; 
+              font-size: 12px; 
+              margin: 0; 
+              padding: 10px;
+              background: white;
+              color: black;
+            }
+            .receipt { 
+              width: 280px; 
+              margin: 0 auto;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 15px;
+              border-bottom: 1px dashed #000;
+              padding-bottom: 10px;
+            }
+            .business-name { 
+              font-size: 16px; 
+              font-weight: bold; 
+              margin-bottom: 5px;
+            }
+            .business-info { 
+              font-size: 10px; 
+              margin-bottom: 5px;
+            }
+            .transaction-info { 
+              margin: 10px 0;
+              border-bottom: 1px dashed #000;
+              padding-bottom: 10px;
+            }
+            .items { 
+              margin: 15px 0;
+            }
+            .item-row { 
+              display: flex; 
+              justify-content: space-between; 
+              margin: 3px 0;
+            }
+            .item-name { 
+              flex: 2; 
+            }
+            .item-details { 
+              flex: 1; 
+              text-align: right;
+            }
+            .totals { 
+              border-top: 1px dashed #000;
+              border-bottom: 1px dashed #000;
+              padding: 10px 0;
+              margin: 15px 0;
+            }
+            .total-row { 
+              display: flex; 
+              justify-content: space-between; 
+              margin: 5px 0;
+            }
+            .footer { 
+              text-align: center; 
+              margin-top: 20px;
+              font-size: 10px;
+            }
+            .thank-you {
+              text-align: center;
+              margin: 15px 0;
+              font-weight: bold;
+            }
+            @media print {
+              body { margin: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="receipt">
+            ${receiptContent}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(() => window.close(), 1000);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+  };
+
+  // Function to close receipt and continue
+  const closeReceiptAndContinue = () => {
+    setShowReceiptModal(false);
+    setLastSale(null);
   };
 
   const clearCart = () => {
@@ -221,7 +346,7 @@ const PointOfSale: React.FC = () => {
                 📦 Added to cart: {scannedProduct.name}
               </p>
               <p className="text-xs text-green-600 mt-1">
-                Price: ${scannedProduct.sell_price.toFixed(2)} | Stock: {scannedProduct.stock}
+                Price: ₦{scannedProduct.sell_price.toFixed(2)} | Stock: {scannedProduct.stock}
               </p>
             </div>
           </div>
@@ -234,7 +359,7 @@ const PointOfSale: React.FC = () => {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="Search products by name, category, or scan barcode to add..."
+              placeholder="Search medicines by name, category, or scan barcode to add..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={handleSearchKeyDown}
@@ -308,10 +433,10 @@ const PointOfSale: React.FC = () => {
                   onClick={() => product.stock > 0 && addToCart(product)}
                 >
                   <p className="font-medium text-gray-800">{product.name}</p>
-                  <p className="text-sm text-gray-600">${product.sell_price.toFixed(2)}</p>
+                  <p className="text-sm text-gray-600">₦{product.sell_price.toFixed(2)}</p>
                   <p className="text-xs text-gray-500">
                     Stock: {product.stock} | 
-                    Cost: ${product.buy_price.toFixed(2)}
+                    Cost: ₦{product.buy_price.toFixed(2)}
                   </p>
                   {product.stock <= 0 && (
                     <p className="text-xs text-red-600 mt-1">Out of Stock</p>
@@ -343,18 +468,18 @@ const PointOfSale: React.FC = () => {
           
           <div className="space-y-4 mb-4 max-h-[400px] overflow-y-auto">
             {cart.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">Cart is empty</p>
+              <p className="text-gray-500 text-center py-8">No Medicines in Cart</p>
             ) : (
               cart.map((item) => (
                 <div key={item.product.id} className="flex items-center justify-between border-b pb-3">
                   <div className="flex-1">
                     <p className="font-medium text-sm">{item.product.name}</p>
                     <p className="text-xs text-gray-600">
-                      ${item.unit_price.toFixed(2)} × {item.quantity}
+                      ₦{item.unit_price.toFixed(2)} × {item.quantity}
                     </p>
-                    <p className="text-xs text-green-600">
-                      Profit: ${((item.unit_price - item.product.buy_price) * item.quantity).toFixed(2)}
-                    </p>
+                    {/* <p className="text-xs text-green-600">
+                      Profit: ₦{((item.unit_price - item.product.buy_price) * item.quantity).toFixed(2)}
+                    </p> */}
                   </div>
                   <div className="flex items-center space-x-2">
                     <button
@@ -386,12 +511,13 @@ const PointOfSale: React.FC = () => {
           <div className="mt-6 space-y-3 border-t pt-4">
             <div className="flex justify-between text-lg font-semibold">
               <span>Total:</span>
-              <span>${subtotal.toFixed(2)}</span>
+              <span>₦{subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-sm text-green-600">
+
+            {/* <div className="flex justify-between text-sm text-green-600">
               <span>Estimated Profit:</span>
-              <span>${totalProfit.toFixed(2)}</span>
-            </div>
+              <span>₦{totalProfit.toFixed(2)}</span>
+            </div> */}
             
             <button
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed mt-4"
@@ -429,12 +555,12 @@ const PointOfSale: React.FC = () => {
             <div className="bg-gray-50 p-4 rounded-lg mb-6">
               <div className="flex justify-between text-sm mb-2">
                 <span>Total Amount:</span>
-                <span className="font-semibold">${subtotal.toFixed(2)}</span>
+                <span className="font-semibold">₦{subtotal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-sm text-green-600">
+              {/* <div className="flex justify-between text-sm text-green-600">
                 <span>Estimated Profit:</span>
-                <span className="font-semibold">${totalProfit.toFixed(2)}</span>
-              </div>
+                <span className="font-semibold">₦{totalProfit.toFixed(2)}</span>
+              </div> */}
             </div>
 
             <div className="flex justify-end space-x-3">
@@ -451,6 +577,113 @@ const PointOfSale: React.FC = () => {
                 disabled={salesLoading}
               >
                 {salesLoading ? 'Processing...' : 'Confirm Sale'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Modal */}
+      {showReceiptModal && lastSale && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 text-center">Sale Completed Successfully!</h3>
+            
+            {/* Printable Receipt (hidden in main view) */}
+            <div ref={receiptRef} className="hidden">
+              <div className="header">
+                <div className="business-name">SOLOMON MEDICALS & STORES</div>
+                <div className="business-info">Your Health is Our Priority</div>
+                <div className="business-info">+234 703 618 2401</div>
+                <div className="business-info">solomonmedicals6715@gmail.com</div>
+              </div>
+              
+              <div className="transaction-info">
+                <div>Receipt #: {lastSale.id}</div>
+                <div>Date: {new Date(lastSale.created_at).toLocaleString()}</div>
+                <div>Payment: {lastSale.payment_method.toUpperCase()}</div>
+              </div>
+              
+              <div className="items">
+                <div className="item-row" style={{borderBottom: '1px dashed #000', paddingBottom: '5px', marginBottom: '5px'}}>
+                  <div className="item-name"><strong>ITEM</strong></div>
+                  <div className="item-details"><strong>QTY × PRICE</strong></div>
+                  <div className="item-details"><strong>AMOUNT</strong></div>
+                </div>
+                  {lastSale.items?.map((item, index) => (
+                    <div key={index} className="item-row">
+                      <div className="item-name">
+                        {/* Now we can use the product_name from the backend */}
+                        {item.product_name || 'Medicine'}
+                      </div>
+                      <div className="item-details">{item.quantity} × ₦{item.unit_sell_price.toFixed(2)}</div>
+                      <div className="item-details">₦{item.total_sell_price.toFixed(2)}</div>
+                    </div>
+                  ))}
+              </div>
+              
+              <div className="totals">
+                <div className="total-row">
+                  <div>Subtotal:</div>
+                  <div>₦{lastSale.total_amount.toFixed(2)}</div>
+                </div>
+                <div className="total-row">
+                  <div>Tax (0%):</div>
+                  <div>₦0.00</div>
+                </div>
+                <div className="total-row">
+                  <div><strong>Total:</strong></div>
+                  <div><strong>₦{lastSale.total_amount.toFixed(2)}</strong></div>
+                </div>
+                <div className="total-row">
+                  <div>Payment:</div>
+                  <div>{lastSale.payment_method.toUpperCase()}</div>
+                </div>
+              </div>
+              
+              <div className="thank-you">
+                THANK YOU FOR YOUR PATRONAGE!
+              </div>
+              
+              <div className="footer">
+                <div>Items are non-refundable</div>
+                <div>Valid receipt for exchange within 7 days</div>
+                <div>--- SOLOMON MEDICALS & STORES ---</div>
+              </div>
+            </div>
+
+            {/* Receipt Preview */}
+            <div className="bg-gray-50 p-4 rounded-lg mb-6 text-center">
+              <div className="text-green-600 font-semibold mb-2">
+                ✅ Sale Completed Successfully
+              </div>
+              <div className="text-sm text-gray-600">
+                Transaction #{lastSale.id}
+              </div>
+              <div className="text-lg font-bold mt-2">
+                Total: ₦{lastSale.total_amount.toFixed(2)}
+              </div>
+              <div className="text-sm text-gray-600 mt-1">
+                Payment: {lastSale.payment_method.toUpperCase()}
+              </div>
+            </div>
+
+            <div className="flex flex-col space-y-3">
+              <button
+                onClick={printReceipt}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print Receipt
+              </button>
+              
+              <button
+                onClick={closeReceiptAndContinue}
+                className="w-full bg-gray-500 text-white py-3 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+              >
+                Continue Selling
               </button>
             </div>
           </div>

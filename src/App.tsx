@@ -4,7 +4,11 @@ import Dashboard from './pages/Dashboard';
 import PointOfSale from './pages/PointOfSale';
 import Inventory from './pages/Inventory';
 import Sales from './pages/Sales';
+import Services from './pages/Services';
 import { PageType } from './types/navigation';
+import AdminPage from './pages/Admin';
+import Settings from './pages/Settings';
+import UpdateChecker from './components/UpdateChecker'; // ← ADD THIS IMPORT
 
 function App() {
   const [currentPage, setCurrentPage] = useState<PageType>('pos');
@@ -19,15 +23,24 @@ function App() {
         return <Inventory />;
       case 'sales':
         return <Sales />;
+      case 'services':
+        return <Services />;
+      case 'admin':
+        return <AdminPage />;
+      case 'settings':
+        return <Settings />;
       default:
         return <PointOfSale />;
     }
   };
 
   return (
-    <Layout activePage={currentPage} setActivePage={setCurrentPage}>
-      {renderPage()}
-    </Layout>
+    <>
+      <UpdateChecker /> 
+      <Layout activePage={currentPage} setActivePage={setCurrentPage}>
+        {renderPage()}
+      </Layout>
+    </>
   );
 }
 

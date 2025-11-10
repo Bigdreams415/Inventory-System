@@ -11,6 +11,7 @@ export interface DashboardSummary {
   totalCategories: number;
   revenueChange: number;
   todayProfit: number;
+  totalStockWorth: number;
 }
 
 export interface SalesTrend {

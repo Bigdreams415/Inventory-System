@@ -4,12 +4,23 @@ import { DashboardSummary, SalesTrend, CategoryDistribution, RecentSale, LowStoc
 const API_BASE_URL = 'http://localhost:3001/api';
 
 class ApiService {
+  private getAuthHeaders(): HeadersInit {
+    const token = this.getAuthToken();
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return headers;
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     const config = {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
       ...options,
     };
 
@@ -17,6 +28,13 @@ class ApiService {
       const response = await fetch(url, config);
       
       if (!response.ok) {
+        if (response.status === 401) {
+          // Don't clear auth for verify-token endpoint
+          if (!endpoint.includes('/auth/verify-token')) {
+            this.clearAuthData();
+          }
+          throw new Error('Unauthorized. Please login again.');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -127,6 +145,114 @@ class ApiService {
 
   async getLowStockProducts(threshold: number = 10): Promise<LowStockProduct[]> {
     return this.request<LowStockProduct[]>(`/dashboard/low-stock?threshold=${threshold}`);
+  }
+
+  async getTotalStockWorth(): Promise<{ total_stock_worth: number }> {
+    return this.request<{ total_stock_worth: number }>('/dashboard/stock-worth');
+  }
+
+  // Authentication
+  async login(username: string, password: string): Promise<{ token: string; username: string }> {
+    try {
+      if (!username?.trim() || !password?.trim()) {
+        throw new Error('Please provide both username and password');
+      }
+
+      const result = await this.request<{ token: string; username: string }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: username.trim(), password }),
+      });
+
+      if (result.token) {
+        localStorage.setItem('auth_token', result.token);
+        localStorage.setItem('username', result.username);
+      }
+
+      return result;
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          throw new Error('Invalid username or password. Please try again.');
+        }
+        if (error.message.includes('Network') || error.message.includes('fetch')) {
+          throw new Error('Unable to connect to server. Please check your connection.');
+        }
+      }
+      throw new Error('Login failed. Please try again later.');
+    }
+  }
+
+  async verifyToken(token?: string): Promise<{ valid: boolean; username?: string }> {
+    try {
+      const authToken = token || localStorage.getItem('auth_token');
+      
+      console.log('🔐 verifyToken called, token from localStorage:', authToken ? `${authToken.substring(0, 20)}...` : 'No token');
+      
+      if (!authToken) {
+        return { valid: false };
+      }
+
+      console.log('📤 Sending token in Authorization header...');
+      const response = await fetch(`${API_BASE_URL}/auth/verify-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}` // ADD THIS LINE - THIS WAS MISSING!
+        },
+        body: JSON.stringify({ token: authToken }),
+      });
+
+      console.log('📥 Response status:', response.status);
+      
+      if (!response.ok) {
+        return { valid: false };
+      }
+
+      const data = await response.json();
+      console.log('✅ Verification response:', data);
+      
+      if (!data.success) {
+        return { valid: false };
+      }
+
+      return data.data;
+    } catch (error) {
+      console.warn('Token verification failed:', error);
+      return { valid: false };
+    }
+  }
+
+  async logout(): Promise<void> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      
+      if (token) {
+        await this.request('/auth/logout', {
+          method: 'POST',
+        });
+      }
+    } catch (error) {
+      console.warn('Logout request failed:', error);
+    } finally {
+      this.clearAuthData();
+    }
+  }
+
+  getAuthToken(): string | null {
+    return localStorage.getItem('auth_token');
+  }
+
+  getUsername(): string | null {
+    return localStorage.getItem('username');
+  }
+
+  isAuthenticated(): boolean {
+    return !!this.getAuthToken();
+  }
+
+  private clearAuthData(): void {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('username');
   }
 }
 

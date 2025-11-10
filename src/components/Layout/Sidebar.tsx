@@ -12,6 +12,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage }) => {
     { id: 'pos' as PageType, label: 'Point of Sale', icon: '💳' },
     { id: 'inventory' as PageType, label: 'Inventory', icon: '📦' },
     { id: 'sales' as PageType, label: 'Sales History', icon: '💰' },
+    { id: 'services' as PageType, label: 'Services', icon: '🛠️' },
+    { id: 'admin' as PageType, label: 'Admin', icon: '🔒' },
+    { id: 'settings' as PageType, label: 'Settings', icon: '⚙️' },
   ];
 
   return (

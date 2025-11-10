@@ -18,3 +18,8 @@ yarn-error.log*
 .DS_Store
 .pnp
 .pnp.js
+dist/
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project

@@ -4,12 +4,13 @@ import { dbService } from '../models/database';
 import { Sale, SaleItem, CreateSaleRequest, SaleWithItems, ApiResponse } from '../types';
 
 export class SaleController {
-  // Create a new sale
+  // Create a new sale for current pharmacy
   public static async createSale(req: Request, res: Response): Promise<void> {
     try {
       const { items, payment_method }: CreateSaleRequest = req.body;
+      const pharmacyId = req.pharmacyId!;
 
-      console.log('Received sale request:', { items, payment_method });
+      console.log('Received sale request for pharmacy:', pharmacyId, { items, payment_method });
 
       // Validate input
       if (!items || !Array.isArray(items) || items.length === 0) {
@@ -34,12 +35,12 @@ export class SaleController {
 
       // Use transaction to ensure data consistency
       const result = await dbService.transaction(async (db) => {
-        // First, validate all products exist and have sufficient stock
+        // First, validate all products exist in current pharmacy and have sufficient stock
         for (const item of items) {
           const product = await new Promise<any>((resolve, reject) => {
             db.get(
-              'SELECT id, name, buy_price, sell_price, stock FROM products WHERE id = ?',
-              [item.product_id],
+              'SELECT id, name, buy_price, sell_price, stock FROM products WHERE id = ? AND pharmacy_id = ?',
+              [item.product_id, pharmacyId],
               (err, row) => {
                 if (err) reject(err);
                 else resolve(row);
@@ -50,7 +51,7 @@ export class SaleController {
           console.log('Product lookup for ID:', item.product_id, 'Result:', product);
 
           if (!product) {
-            throw new Error(`Product not found with ID: ${item.product_id}. Please refresh the product list.`);
+            throw new Error(`Product not found with ID: ${item.product_id} in current pharmacy. Please refresh the product list.`);
           }
 
           if (product.stock < item.quantity) {
@@ -58,11 +59,11 @@ export class SaleController {
           }
         }
 
-        // ✅ FIX: Create sale record FIRST before any sale items
+        // Create sale record FIRST before any sale items
         await new Promise<void>((resolve, reject) => {
           db.run(
-            'INSERT INTO sales (id, total_amount, total_profit, payment_method) VALUES (?, ?, ?, ?)',
-            [saleId, 0, 0, payment_method], // Start with 0 values, update later
+            'INSERT INTO sales (id, pharmacy_id, total_amount, total_profit, payment_method) VALUES (?, ?, ?, ?, ?)',
+            [saleId, pharmacyId, 0, 0, payment_method], // Start with 0 values, update later
             (err) => {
               if (err) {
                 console.error('Error inserting sale:', err);
@@ -79,8 +80,8 @@ export class SaleController {
           // Get product details again within transaction
           const product = await new Promise<any>((resolve, reject) => {
             db.get(
-              'SELECT id, name, buy_price, sell_price, stock FROM products WHERE id = ?',
-              [item.product_id],
+              'SELECT id, name, buy_price, sell_price, stock FROM products WHERE id = ? AND pharmacy_id = ?',
+              [item.product_id, pharmacyId],
               (err, row) => {
                 if (err) reject(err);
                 else resolve(row);
@@ -97,7 +98,7 @@ export class SaleController {
           totalAmount += totalSellPrice;
           totalProfit += itemProfit;
 
-          console.log('Creating sale item:', {
+          console.log('Creating sale item for pharmacy:', pharmacyId, {
             productId: item.product_id,
             quantity: item.quantity,
             unitSellPrice,
@@ -105,13 +106,13 @@ export class SaleController {
             itemProfit
           });
 
-          // ✅ Now the sale exists, so foreign key constraint will work
+          // Create sale item with pharmacy context
           const saleItemId = uuidv4();
           await new Promise<void>((resolve, reject) => {
             db.run(
-              `INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_sell_price, unit_buy_price, total_sell_price, item_profit) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-              [saleItemId, saleId, item.product_id, item.quantity, unitSellPrice, unitBuyPrice, totalSellPrice, itemProfit],
+              `INSERT INTO sale_items (id, pharmacy_id, sale_id, product_id, quantity, unit_sell_price, unit_buy_price, total_sell_price, item_profit) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [saleItemId, pharmacyId, saleId, item.product_id, item.quantity, unitSellPrice, unitBuyPrice, totalSellPrice, itemProfit],
               (err) => {
                 if (err) {
                   console.error('Error inserting sale item:', err);
@@ -123,11 +124,11 @@ export class SaleController {
             );
           });
 
-          // Update product stock
+          // Update product stock in current pharmacy
           await new Promise<void>((resolve, reject) => {
             db.run(
-              'UPDATE products SET stock = stock - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-              [item.quantity, item.product_id],
+              'UPDATE products SET stock = stock - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND pharmacy_id = ?',
+              [item.quantity, item.product_id, pharmacyId],
               (err) => {
                 if (err) {
                   console.error('Error updating product stock:', err);
@@ -140,11 +141,11 @@ export class SaleController {
           });
         }
 
-        // ✅ Update sale with final calculated totals
+        // Update sale with final calculated totals
         await new Promise<void>((resolve, reject) => {
           db.run(
-            'UPDATE sales SET total_amount = ?, total_profit = ? WHERE id = ?',
-            [totalAmount, totalProfit, saleId],
+            'UPDATE sales SET total_amount = ?, total_profit = ? WHERE id = ? AND pharmacy_id = ?',
+            [totalAmount, totalProfit, saleId, pharmacyId],
             (err) => {
               if (err) {
                 console.error('Error updating sale totals:', err);
@@ -160,9 +161,9 @@ export class SaleController {
       });
 
       // Get the complete sale with items for response
-      const sale = await SaleController.getSaleWithItems(saleId);
+      const sale = await SaleController.getSaleWithItems(saleId, pharmacyId);
 
-      console.log('Sale completed successfully:', saleId);
+      console.log('Sale completed successfully for pharmacy:', pharmacyId, saleId);
 
       res.status(201).json({
         success: true,
@@ -179,77 +180,83 @@ export class SaleController {
     }
   }
 
-  // Get all sales with pagination
-// Get all sales with pagination
-    public static async getSales(req: Request, res: Response): Promise<void> {
+  // Get all sales for current pharmacy with pagination
+  public static async getSales(req: Request, res: Response): Promise<void> {
     try {
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 50;
-        const offset = (page - 1) * limit;
+      const pharmacyId = req.pharmacyId!;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = (page - 1) * limit;
 
-        // Get sales with their items
-        const sales = await dbService.all<Sale & { items?: SaleItem[]; sale_items?: string }>(`
+      // Get sales with their items for current pharmacy
+      const sales = await dbService.all<Sale & { items?: SaleItem[]; sale_items?: string }>(`
         SELECT 
-            s.*,
-            GROUP_CONCAT(
+          s.*,
+          GROUP_CONCAT(
             json_object(
-                'id', si.id,
-                'product_id', si.product_id,
-                'quantity', si.quantity,
-                'unit_sell_price', si.unit_sell_price,
-                'unit_buy_price', si.unit_buy_price,
-                'total_sell_price', si.total_sell_price,
-                'item_profit', si.item_profit,
-                'product_name', p.name
+              'id', si.id,
+              'product_id', si.product_id,
+              'quantity', si.quantity,
+              'unit_sell_price', si.unit_sell_price,
+              'unit_buy_price', si.unit_buy_price,
+              'total_sell_price', si.total_sell_price,
+              'item_profit', si.item_profit,
+              'product_name', p.name
             )
-            ) as sale_items
+          ) as sale_items
         FROM sales s
-        LEFT JOIN sale_items si ON s.id = si.sale_id
-        LEFT JOIN products p ON si.product_id = p.id
+        LEFT JOIN sale_items si ON s.id = si.sale_id AND si.pharmacy_id = ?
+        LEFT JOIN products p ON si.product_id = p.id AND p.pharmacy_id = ?
+        WHERE s.pharmacy_id = ?
         GROUP BY s.id
         ORDER BY s.created_at DESC 
         LIMIT ? OFFSET ?
-        `, [limit, offset]);
+      `, [pharmacyId, pharmacyId, pharmacyId, limit, offset]);
 
-        // Parse the sale_items JSON strings
-        const salesWithItems = sales.map(sale => ({
+      // Parse the sale_items JSON strings
+      const salesWithItems = sales.map(sale => ({
         ...sale,
         items: sale.sale_items ? JSON.parse(`[${sale.sale_items}]`) : []
-        }));
+      }));
 
-        const totalResult = await dbService.get<{ count: number }>('SELECT COUNT(*) as count FROM sales');
-        const total = totalResult?.count || 0;
+      // Get total count for current pharmacy
+      const totalResult = await dbService.get<{ count: number }>(
+        'SELECT COUNT(*) as count FROM sales WHERE pharmacy_id = ?', 
+        [pharmacyId]
+      );
+      const total = totalResult?.count || 0;
 
-        res.json({
+      res.json({
         success: true,
         data: salesWithItems,
         pagination: {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit)
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
         }
-        });
+      });
     } catch (error) {
-        console.error('Error fetching sales:', error);
-        res.status(500).json({
+      console.error('Error fetching sales:', error);
+      res.status(500).json({
         success: false,
         error: 'Failed to fetch sales'
-        });
+      });
     }
-    }
+  }
 
-  // Get sale by ID with items
+  // Get sale by ID with items for current pharmacy
   public static async getSaleById(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
+      const pharmacyId = req.pharmacyId!;
       
-      const sale = await SaleController.getSaleWithItems(id);
+      const sale = await SaleController.getSaleWithItems(id, pharmacyId);
       
       if (!sale) {
         res.status(404).json({
           success: false,
-          error: 'Sale not found'
+          error: 'Sale not found in current pharmacy'
         });
         return;
       }
@@ -267,16 +274,17 @@ export class SaleController {
     }
   }
 
-  // Get today's sales summary
+  // Get today's sales summary for current pharmacy
   public static async getTodaySales(req: Request, res: Response): Promise<void> {
     try {
+      const pharmacyId = req.pharmacyId!;
       const today = new Date().toISOString().split('T')[0];
       
       const sales = await dbService.all<Sale>(
         `SELECT * FROM sales 
-         WHERE DATE(created_at) = ? 
+         WHERE pharmacy_id = ? AND DATE(created_at) = ? 
          ORDER BY created_at DESC`,
-        [today]
+        [pharmacyId, today]
       );
 
       const summary = await dbService.get<{ total_sales: number; total_amount: number; total_profit: number }>(
@@ -285,8 +293,8 @@ export class SaleController {
            COALESCE(SUM(total_amount), 0) as total_amount,
            COALESCE(SUM(total_profit), 0) as total_profit
          FROM sales 
-         WHERE DATE(created_at) = ?`,
-        [today]
+         WHERE pharmacy_id = ? AND DATE(created_at) = ?`,
+        [pharmacyId, today]
       );
 
       res.json({
@@ -297,7 +305,8 @@ export class SaleController {
             totalSales: summary?.total_sales || 0,
             totalAmount: summary?.total_amount || 0,
             totalProfit: summary?.total_profit || 0
-          }
+          },
+          pharmacyId
         }
       });
     } catch (error) {
@@ -309,33 +318,152 @@ export class SaleController {
     }
   }
 
-    // Helper method to get sale with items
-    private static async getSaleWithItems(saleId: string): Promise<SaleWithItems | null> {
-        try {
-            const sale = await dbService.get<Sale>('SELECT * FROM sales WHERE id = ?', [saleId]);
-            
-            if (!sale) {
-            return null;
-            }
+  // Helper method to get sale with items for specific pharmacy
+  private static async getSaleWithItems(saleId: string, pharmacyId: string): Promise<SaleWithItems | null> {
+    try {
+      const sale = await dbService.get<Sale>(
+        'SELECT * FROM sales WHERE id = ? AND pharmacy_id = ?', 
+        [saleId, pharmacyId]
+      );
+      
+      if (!sale) {
+        return null;
+      }
 
-            const items = await dbService.all<SaleItem & { product_name: string }>(`
-            SELECT 
-                si.*,
-                p.name as product_name
-            FROM sale_items si 
-            LEFT JOIN products p ON si.product_id = p.id 
-            WHERE si.sale_id = ?
-            `, [saleId]);
+      const items = await dbService.all<SaleItem & { product_name: string }>(`
+        SELECT 
+          si.*,
+          p.name as product_name
+        FROM sale_items si 
+        LEFT JOIN products p ON si.product_id = p.id AND p.pharmacy_id = ?
+        WHERE si.sale_id = ? AND si.pharmacy_id = ?
+      `, [pharmacyId, saleId, pharmacyId]);
 
-            return {
-            ...sale,
-            items: items.map(item => {
-                const { product_name, ...itemWithoutProductName } = item;
-                return itemWithoutProductName;
-            })
-            };
-            } catch (error) {
-                throw error;
-            }
-        }
+      return {
+        ...sale,
+        items: items.map(item => ({
+          ...item,
+          product_name: item.product_name // ✅ Keep the product name!
+        }))
+      };
+    } catch (error) {
+      throw error;
     }
+  }
+
+  // NEW: Get sales by date range for current pharmacy
+  public static async getSalesByDateRange(req: Request, res: Response): Promise<void> {
+    try {
+      const pharmacyId = req.pharmacyId!;
+      const { startDate, endDate } = req.query;
+
+      if (!startDate || !endDate) {
+        res.status(400).json({
+          success: false,
+          error: 'Start date and end date are required'
+        });
+        return;
+      }
+
+      const sales = await dbService.all<Sale & { items?: SaleItem[]; sale_items?: string }>(`
+        SELECT 
+          s.*,
+          GROUP_CONCAT(
+            json_object(
+              'id', si.id,
+              'product_id', si.product_id,
+              'quantity', si.quantity,
+              'unit_sell_price', si.unit_sell_price,
+              'unit_buy_price', si.unit_buy_price,
+              'total_sell_price', si.total_sell_price,
+              'item_profit', si.item_profit,
+              'product_name', p.name
+            )
+          ) as sale_items
+        FROM sales s
+        LEFT JOIN sale_items si ON s.id = si.sale_id AND si.pharmacy_id = ?
+        LEFT JOIN products p ON si.product_id = p.id AND p.pharmacy_id = ?
+        WHERE s.pharmacy_id = ? AND DATE(s.created_at) BETWEEN ? AND ?
+        GROUP BY s.id
+        ORDER BY s.created_at DESC
+      `, [pharmacyId, pharmacyId, pharmacyId, startDate, endDate]);
+
+      // Parse the sale_items JSON strings
+      const salesWithItems = sales.map(sale => ({
+        ...sale,
+        items: sale.sale_items ? JSON.parse(`[${sale.sale_items}]`) : []
+      }));
+
+      res.json({
+        success: true,
+        data: salesWithItems
+      });
+    } catch (error) {
+      console.error('Error fetching sales by date range:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch sales by date range'
+      });
+    }
+  }
+
+  // NEW: Refund a sale (soft delete)
+  public static async refundSale(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const pharmacyId = req.pharmacyId!;
+
+      // Use transaction to ensure data consistency
+      await dbService.transaction(async (db) => {
+        // Get sale items to restore stock
+        const saleItems = await new Promise<any[]>((resolve, reject) => {
+          db.all(
+            'SELECT product_id, quantity FROM sale_items WHERE sale_id = ? AND pharmacy_id = ?',
+            [id, pharmacyId],
+            (err, rows) => {
+              if (err) reject(err);
+              else resolve(rows);
+            }
+          );
+        });
+
+        // Restore product stock
+        for (const item of saleItems) {
+          await new Promise<void>((resolve, reject) => {
+            db.run(
+              'UPDATE products SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND pharmacy_id = ?',
+              [item.quantity, item.product_id, pharmacyId],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+        }
+
+        // Mark sale as refunded
+        await new Promise<void>((resolve, reject) => {
+          db.run(
+            'UPDATE sales SET status = ? WHERE id = ? AND pharmacy_id = ?',
+            ['refunded', id, pharmacyId],
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        });
+      });
+
+      res.json({
+        success: true,
+        message: 'Sale refunded successfully and stock restored'
+      });
+    } catch (error) {
+      console.error('Error refunding sale:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to refund sale'
+      });
+    }
+  }
+}

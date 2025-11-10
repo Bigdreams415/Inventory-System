@@ -3,6 +3,7 @@ import { Product } from '../types';
 import { useProducts } from '../hooks/useProducts';
 import { useBarcode } from '../hooks/useBarcode';
 import { apiService } from '../services/api'; 
+import { useAuthCheck } from '../hooks/useAuthCheck';
 
 const Inventory: React.FC = () => {
   const { 
@@ -13,7 +14,7 @@ const Inventory: React.FC = () => {
     updateProduct, 
     deleteProduct 
   } = useProducts();
-  
+  const { isAdmin, checkingAuth } = useAuthCheck();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -140,9 +141,9 @@ const Inventory: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Category
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Buy Price
-                </th>
+                </th> */}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Sell Price
                 </th>
@@ -182,14 +183,14 @@ const Inventory: React.FC = () => {
                       <div className="text-sm text-gray-500">{product.category}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">${product.buy_price.toFixed(2)}</div>
+                      <div className="text-sm text-gray-900">₦{product.buy_price.toFixed(2)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-green-900">${product.sell_price.toFixed(2)}</div>
+                      <div className="text-sm font-semibold text-green-900">₦{product.sell_price.toFixed(2)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">
-                        <div className="text-gray-900">${profitMargin.toFixed(2)}</div>
+                        <div className="text-gray-900">₦{profitMargin.toFixed(2)}</div>
                         <div className={`text-xs ${profitPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           ({profitPercentage.toFixed(1)}%)
                         </div>
@@ -211,15 +212,18 @@ const Inventory: React.FC = () => {
                       <button
                         onClick={() => setEditingProduct(product)}
                         className="text-blue-600 hover:text-blue-900"
+                        disabled={!isAdmin} // Disable if not admin
                       >
                         Edit
                       </button>
-                      <button
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Delete
-                      </button>
+                      {isAdmin && ( // Only show delete button if admin
+                        <button
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -355,7 +359,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
       try {
         const exists = await apiService.checkBarcodeExists(formData.barcode);
         if (exists.exists) {
-          const useExisting = confirm(
+          const useExisting = window.confirm(
             `Barcode "${formData.barcode}" already exists for product "${exists.product?.name}".\n\nDo you want to update the existing product instead?`
           );
           if (useExisting && exists.product) {
@@ -460,7 +464,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Buy Price ($) *
+                Buy Price (₦) *
               </label>
               <input
                 type="number"
@@ -476,7 +480,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sell Price ($) *
+                Sell Price (₦) *
               </label>
               <input
                 type="number"
@@ -498,7 +502,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
                 <div className="flex justify-between">
                   <span>Profit Margin:</span>
                   <span className={`font-semibold ${profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    ${profitMargin.toFixed(2)} ({profitPercentage.toFixed(1)}%)
+                    ₦{profitMargin.toFixed(2)} ({profitPercentage.toFixed(1)}%)
                   </span>
                 </div>
                 {profitMargin < 0 && (

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { Sale } from '../types';
 import { useSales } from '../hooks/useSales';
 
 const Sales: React.FC = () => {
+  //eslint-disable-next-line react-hooks/exhaustive-deps
   const { getSales, loading, error } = useSales();
   const [sales, setSales] = useState<Sale[]>([]);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
@@ -126,7 +127,7 @@ const Sales: React.FC = () => {
     if (salesCount <= 5) return 'bg-green-300 hover:bg-green-400';
     return 'bg-green-500 text-white hover:bg-green-600';
   };
-
+  //eslint-disable-next-line react-hooks/exhaustive-deps
   const salesDates = getSalesDates();
   const calendarDays = getCalendarDays();
   const today = new Date();
@@ -293,7 +294,7 @@ const Sales: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
               <p className="text-2xl font-semibold text-gray-900">
-                ${filteredSales.reduce((sum, sale) => sum + (sale.total_amount || 0), 0).toFixed(2)}
+                ₦{filteredSales.reduce((sum, sale) => sum + (sale.total_amount || 0), 0).toFixed(2)}
               </p>
             </div>
           </div>
@@ -309,7 +310,7 @@ const Sales: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Profit</p>
               <p className="text-2xl font-semibold text-green-600">
-                ${filteredSales.reduce((sum, sale) => sum + (sale.total_profit || 0), 0).toFixed(2)}
+                ₦{filteredSales.reduce((sum, sale) => sum + (sale.total_profit || 0), 0).toFixed(2)}
               </p>
             </div>
           </div>
@@ -400,9 +401,12 @@ const Sales: React.FC = () => {
                         </span> items
                       </div>
                       <div className="text-xs text-gray-500 max-w-xs truncate">
-                        {sale.items?.slice(0, 2).map(item => 
-                          item.product?.name || `#${item.product_id?.slice(-6)}`
-                        ).join(', ')}
+                        {sale.items?.slice(0, 2).map(item => {
+                          const productName = item.product_name || 
+                                            item.product?.name || 
+                                            `Product #${item.product_id?.slice(-6) || 'N/A'}`;
+                          return productName;
+                        }).join(', ')}
                         {sale.items && sale.items.length > 2 && ` +${sale.items.length - 2} more`}
                       </div>
                     </td>
@@ -413,12 +417,12 @@ const Sales: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
-                        ${(sale.total_amount || 0).toFixed(2)}
+                        ₦{(sale.total_amount || 0).toFixed(2)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className={`text-sm font-semibold ${getProfitColor(sale.total_profit || 0)}`}>
-                        ${(sale.total_profit || 0).toFixed(2)}
+                        ₦{(sale.total_profit || 0).toFixed(2)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -537,9 +541,9 @@ const Sales: React.FC = () => {
                                 </span>
                               </div>
                               <div>
-                                <div className="font-medium text-gray-900 text-sm">
-                                  {item.product?.name || `Product #${item.product_id?.slice(-6) || 'N/A'}`}
-                                </div>
+                              <div className="font-medium text-gray-900 text-sm">
+                                {item.product_name || item.product?.name || `Product #${item.product_id?.slice(-6) || 'N/A'}`}
+                              </div>
                                 {item.product_id && (
                                   <div className="text-xs text-gray-400 font-mono mt-1">
                                     SKU: {item.product_id.slice(-8)}
@@ -557,13 +561,13 @@ const Sales: React.FC = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-600">
-                            <div className="font-medium">${(item.unit_sell_price || 0).toFixed(2)}</div>
+                            <div className="font-medium">₦{(item.unit_sell_price || 0).toFixed(2)}</div>
                             <div className="text-xs text-gray-400">
-                              Cost: ${(item.unit_buy_price || 0).toFixed(2)}
+                              Cost: ₦{(item.unit_buy_price || 0).toFixed(2)}
                             </div>
                           </td>
                           <td className="px-6 py-4 text-sm font-semibold text-gray-900">
-                            ${(item.total_sell_price || 0).toFixed(2)}
+                            ₦{(item.total_sell_price || 0).toFixed(2)}
                           </td>
                           <td className="px-6 py-4 text-sm">
                             <div className={`font-bold text-center px-2 py-1 rounded ${
@@ -571,7 +575,7 @@ const Sales: React.FC = () => {
                                 ? 'bg-green-100 text-green-800' 
                                 : 'bg-red-100 text-red-800'
                             }`}>
-                              ${(item.item_profit || 0).toFixed(2)}
+                              ₦{(item.item_profit || 0).toFixed(2)}
                             </div>
                             <div className="text-xs text-gray-500 text-center mt-1">
                               {item.unit_buy_price ? 
@@ -594,11 +598,11 @@ const Sales: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600">Subtotal:</span>
-                      <span className="font-semibold">${(selectedSale.total_amount || 0).toFixed(2)}</span>
+                      <span className="font-semibold">₦{(selectedSale.total_amount || 0).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-lg font-bold border-t pt-3">
                       <span>Total Revenue:</span>
-                      <span className="text-blue-600">${(selectedSale.total_amount || 0).toFixed(2)}</span>
+                      <span className="text-blue-600">₦{(selectedSale.total_amount || 0).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -609,13 +613,13 @@ const Sales: React.FC = () => {
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600">Total Cost:</span>
                       <span className="font-semibold">
-                        ${((selectedSale.total_amount || 0) - (selectedSale.total_profit || 0)).toFixed(2)}
+                        ₦{((selectedSale.total_amount || 0) - (selectedSale.total_profit || 0)).toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-lg font-bold border-t pt-3">
                       <span>Net Profit:</span>
                       <span className={getProfitColor(selectedSale.total_profit || 0)}>
-                        ${(selectedSale.total_profit || 0).toFixed(2)}
+                        ₦{(selectedSale.total_profit || 0).toFixed(2)}
                       </span>
                     </div>
                     {selectedSale.total_amount && selectedSale.total_amount > 0 && (
