@@ -27,6 +27,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Build Server
+        run: |
+          cd server
+          npm install
+          npm run build
+          cd ..
+
       - name: Rebuild native modules for Electron
         run: npx electron-rebuild --force --parallel
 
