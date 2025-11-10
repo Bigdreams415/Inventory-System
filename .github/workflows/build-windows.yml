@@ -27,17 +27,28 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Install Server Dependencies
+        run: |
+          cd server
+          npm install --production
+          cd ..
+
+      - name: Rebuild Native Modules for Main App
+        run: npx electron-rebuild --force --parallel
+
+      - name: Rebuild Native Modules for Server
+        run: |
+          cd server
+          npm rebuild
+          cd ..
+
       - name: Build Server
         run: |
           cd server
-          npm install
           npm run build
           cd ..
 
-      - name: Rebuild native modules for Electron
-        run: npx electron-rebuild --force --parallel
-
-      - name: Build Electron app for Windows (unsigned)
+      - name: Build Electron App for Windows (unsigned)
         run: |
           npm run build
           npx electron-builder --win --x64 --publish=never
