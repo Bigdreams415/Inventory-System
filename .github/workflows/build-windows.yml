@@ -1,8 +1,9 @@
+name: Build Electron App for Windows
+
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -29,13 +30,7 @@ jobs:
       - name: Rebuild native modules for Electron
         run: npx electron-rebuild --force --parallel
 
-      - name: Build Electron app for Windows
+      - name: Build Electron app for Windows (unsigned)
         run: |
           npm run build
-          npx electron-builder --win --x64
-
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-build
-          path: dist/win-unpacked/
+          npx electron-builder --win --x64 --publish=never
