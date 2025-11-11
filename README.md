@@ -12,4 +12,4 @@
 │   ├── main.js
 │   └── package.json
 └── shared/                 # Shared types/config
-    └── types.ts
+    └── types.ts# Inventory-System-Online
