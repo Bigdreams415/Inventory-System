@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useServices } from '../hooks/useService';
-import { Service, ServiceSale } from '../types';
+import { Service } from '../types';
 
 const Services: React.FC = () => {
   const {

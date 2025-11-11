@@ -14,7 +14,7 @@ const Inventory: React.FC = () => {
     updateProduct, 
     deleteProduct 
   } = useProducts();
-  const { isAdmin, checkingAuth } = useAuthCheck();
+  const { isAdmin } = useAuthCheck();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -289,7 +289,8 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
-  const [barcodeLoading, setBarcodeLoading] = useState(false);
+  //eslint-disable-next-line react-hooks/exhaustive-deps
+  const [, setBarcodeLoading] = useState(false);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
   const { 
@@ -310,7 +311,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
         sell_price: scannedProduct.sell_price,
         category: scannedProduct.category,
         description: scannedProduct.description || '',
-        barcode: scannedProduct.barcode || formData.barcode
+        barcode: scannedProduct.barcode || prev.barcode
       }));
     }
   }, [scannedProduct, product]);

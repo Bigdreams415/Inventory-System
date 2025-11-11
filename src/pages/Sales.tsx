@@ -5,7 +5,7 @@ import { useSales } from '../hooks/useSales';
 
 const Sales: React.FC = () => {
   //eslint-disable-next-line react-hooks/exhaustive-deps
-  const { getSales, loading, error } = useSales();
+  const { getSales, } = useSales();
   const [sales, setSales] = useState<Sale[]>([]);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [dateFilter, setDateFilter] = useState<string>('');
@@ -31,6 +31,7 @@ const Sales: React.FC = () => {
 
   useEffect(() => {
     loadSales();
+    //eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fixed date filtering - handles different date formats
@@ -53,16 +54,17 @@ const Sales: React.FC = () => {
     : sales;
 
   // Get unique dates from sales for calendar
-  const getSalesDates = () => {
-    const dates = new Set();
-    sales.forEach(sale => {
-      if (sale.created_at) {
-        const date = new Date(sale.created_at).toISOString().split('T')[0];
-        dates.add(date);
-      }
-    });
-    return Array.from(dates) as string[];
-  };
+  //eslint-disable-next-line react-hooks/exhaustive-deps
+  // const getSalesDates = () => {
+  //   const dates = new Set();
+  //   sales.forEach(sale => {
+  //     if (sale.created_at) {
+  //       const date = new Date(sale.created_at).toISOString().split('T')[0];
+  //       dates.add(date);
+  //     }
+  //   });
+  //   return Array.from(dates) as string[];
+  // };
 
   // Enhanced calendar functions
   const getCalendarDays = () => {
@@ -128,7 +130,6 @@ const Sales: React.FC = () => {
     return 'bg-green-500 text-white hover:bg-green-600';
   };
   //eslint-disable-next-line react-hooks/exhaustive-deps
-  const salesDates = getSalesDates();
   const calendarDays = getCalendarDays();
   const today = new Date();
 

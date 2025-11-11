@@ -113,10 +113,6 @@ const PointOfSale: React.FC = () => {
 
   // Calculate totals
   const subtotal = cart.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
-  const totalProfit = cart.reduce((sum, item) => {
-    const profitPerItem = item.unit_price - item.product.buy_price;
-    return sum + (profitPerItem * item.quantity);
-  }, 0);
 
   // Function to process sale
   const handleProcessSale = async () => {

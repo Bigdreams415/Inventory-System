@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Product } from '../types';
 import { apiService } from '../services/api';
 
@@ -7,7 +7,7 @@ export const useBarcode = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const barcodeInputRef = useRef<string>('');
-  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
 
   // Handle barcode input from scanner (scanners send data quickly with Enter at the end)
   const handleBarcodeScan = useCallback(async (barcode: string) => {
